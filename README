@@ -41,7 +41,13 @@ Configuration:
         definition in either ~/.cplayrc or /etc/cplayrc. If one of these
         files is available, it is executed by cplay before initialization.
 
-        Note, currently there is no version control for the rc-file!
+        Macros are defined using the MACRO dictionary, where the key is
+        a key and the value is a string of cplay input. For example, the
+        following would make ,d delete tagged (or current) files:
+
+                MACRO['d'] = '!rm "$@"\n'
+
+        Note, there is currently no version control for the rc-file!
 
 Miscellaneous:
 
@@ -55,5 +61,9 @@ Miscellaneous:
         It is also possible to pipe a playlist to cplay, as stdin
         will be reopened on startup unless it is attached to a tty.
 
-        Remote control via /var/tmp/cplay_control; see lircrc.
+        Remote control is available via /var/tmp/cplay_control.
+        Create this with mkfifo and see lircrc for examples.
+
+        The shell command gets the full path of either all tagged
+        items or the current item as positional arguments.
 
