@@ -51,7 +51,7 @@ begin
     button = VOLUME_UP_DOWN
     prog   = irexec
     repeat = 1
-    config = echo "volup" > /var/tmp/cplay_control
+    config = echo "volume cue 1" > /var/tmp/cplay_control
 end
 
 begin
@@ -59,7 +59,7 @@ begin
     button = VOLUME_DOWN_DOWN
     prog   = irexec
     repeat = 1
-    config = echo "voldown" > /var/tmp/cplay_control
+    config = echo "volume cue -1" > /var/tmp/cplay_control
 end
 
 begin
