@@ -1367,6 +1367,17 @@ class NoOffsetPlayer(Player):
         return 1
 
 # ------------------------------------------
+class MPlayer(Player):
+    re_progress = re.compile("^A:.*?(\d+)\.\d \([^)]+\) of (\d+)\.\d")
+
+    def parse_buf(self):
+        match = self.re_progress.search(self.buf)
+        if match:
+            curS, totS = map(string.atoi, match.groups())
+            position, length = curS, totS
+            self.set_position(position, length, [position, length])
+
+# ------------------------------------------
 class Timeout:
     def __init__(self):
         self.next = 0
@@ -1717,7 +1728,8 @@ PLAYERS = [
     NoOffsetPlayer("mikmod -q -p0 %s", "\.(mod|xm|fm|s3m|med|col|669|it|mtm)$"),
     NoOffsetPlayer("xmp -q %s", "\.(mod|xm|fm|s3m|med|col|669|it|mtm|stm)$"),
     NoOffsetPlayer("play %s", "\.(aiff|au|cdr|mp3|ogg|wav)$"),
-    NoOffsetPlayer("speexdec %s", "\.spx$")
+    NoOffsetPlayer("speexdec %s", "\.spx$"),
+    MPlayer("mplayer -vo null %s", "^http://|\.(mp[123]|ogg|flac|spx|mp[cp+]|mod|xm|fm|s3m|med|col|669|it|mtm|stm|aiff|au|cdr|wav)$"),
     ]
 
 MACRO = {}
