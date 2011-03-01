@@ -32,6 +32,7 @@ import getopt
 import signal
 import string
 import select
+from subprocess import call
 import re
 
 try: from ncurses import curses
@@ -617,16 +618,8 @@ class TagListWindow(ListWindow):
         sys.stderr.write("\n")
         argv = map(lambda x: x.pathname, self.get_tagged())
         argv or self.current() and argv.append(self.current().pathname)
-        argv = ["/bin/sh", "-c", s, "--"] + argv
-        pid = os.fork()
-        if pid == 0:
-            try: os.execv(argv[0], argv)
-            except: os._exit(1)
-        try:
-            # this used to work!
-            pid, r = os.waitpid(pid, 0)
-            sys.stderr.write("\nshell returned %s, press return!\n" % r)
-        except: pass
+        r = call(' '.join([s] + argv), shell=True)
+        sys.stderr.write("\nshell returned %s, press return!\n" % r)
         sys.stdin.readline()
         app.win_root.update()
         app.restore_default_status()
@@ -1429,7 +1422,6 @@ class Application:
         try: curses.meta(1)
         except: pass
         self.cursor(0)
-        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
         signal.signal(signal.SIGHUP, self.handler_quit)
         signal.signal(signal.SIGINT, self.handler_quit)
         signal.signal(signal.SIGTERM, self.handler_quit)
