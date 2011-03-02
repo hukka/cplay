@@ -36,6 +36,13 @@ import select
 from subprocess import call
 import traceback
 
+global mg
+try:
+    import magic
+    mg = magic.open(magic.MAGIC_NONE)
+    mg.load()
+except ImportError:
+    mg = None
 
 try: from ncurses import curses
 except ImportError: import curses
@@ -1129,6 +1136,32 @@ class PlaylistWindow(TagListWindow):
             app.status(e, 2)
 
 # ------------------------------------------
+def get_type(pathname):
+    if mg:
+        mg_string = mg.file(pathname)
+        logging.debug("Magic type:" + mg_string)
+        if re.match("^Ogg data, Vorbis audio.*", mg_string):
+            ftype = 'oggvorbis'
+        elif re.match("^Ogg data, FLAC audio.*", mg_string):
+            ftype = 'oggflac'
+        elif re.match("FLAC audio bitstream.*", mg_string):
+            ftype = 'flac'
+        elif re.match("Audio file with ID.*layer III.*", mg_string):
+            ftype = 'id3'
+        else:
+            ftype = "unknown"
+        logging.debug("Magic category: " + ftype)
+        return ftype
+    if re.match(".*\.ogg$", pathname, re.I):
+        return 'oggvorbis'
+    elif re.match(".*\.oga$", pathname, re.I):
+        return 'oggflac'
+    elif re.match(".*\.flac$", pathname, re.I):
+        return 'flac'
+    elif re.match(".*\.mp3$", pathname, re.I):
+        return 'id3'
+    return "unknown"
+
 # FIXME: Metadata gathering seems a bit slow now. Perhaps it could be done
 #        in background so it wouldn't slow down responsiveness
 def get_tag(pathname):
@@ -1141,20 +1174,18 @@ def get_tag(pathname):
         app.status(_("Can't read metadata, module mutagen not available"), 2)
         return pathname
 
-    # FIXME: use magic instead of file extensions to identify OGGs and MP3s
-    # FIXME: Needs to understand other formats too, at least FLAC
-    #        Check mutagen and mmpython
+    ftype = get_type(pathname)
     try:
-        if re.compile(".*\.ogg$", re.I).match(pathname):
+        if ftype == 'oggvorbis':
             import mutagen.oggvorbis
             metaopen = mutagen.oggvorbis.Open
-        elif re.compile(".*\.mp3$", re.I).match(pathname):
+        elif ftype == 'id3':
             import mutagen.easyid3
             metaopen = mutagen.easyid3.Open
-        elif re.compile(".*\.flac$", re.I).match(pathname):
+        elif ftype == 'flac':
             import mutagen.flac
             metaopen = mutagen.flac.Open
-        elif re.compile(".*\.oga$", re.I).match(pathname):
+        elif ftype == 'oggflac':
             import mutagen.oggflac
             metaopen = mutagen.oggflac.Open
         else:

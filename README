@@ -22,6 +22,7 @@ Requirements:
         - sox         (optional)  http://sox.sf.net/
         - speex       (optional)  http://www.speex.org/
         - mutagen     (optional)  http://code.google.com/p/mutagen/
+        - magic       (optional)  http://www.darwinsys.com/file/
 
 Installation:
 
