@@ -257,7 +257,8 @@ class StatusWindow(Window):
 class CounterWindow(Window):
     def __init__(self, parent):
         Window.__init__(self, parent)
-        self.values = [0, 0]
+        self.values = [0, 0] # [seconds elapsed, seconds remaining
+                             #  of current track]
         self.mode = 1
 
     def newwin(self):
@@ -274,6 +275,7 @@ class CounterWindow(Window):
         self.refresh()
 
     def counter(self, values):
+        """Update the counter with [elapsed, remaining] seconds"""
         self.values = values
         self.update()
 
@@ -1234,7 +1236,6 @@ class Player:
             app.progress(0)
             self.offset = 0
             self.length = 0
-            self.values = [0, 0]
         self.time_setup = time.time()
         return self.argv[0]
 
@@ -1301,14 +1302,18 @@ class Player:
             self.offset = (offset < 0) and self.length+offset or offset
         self.show_position()
 
-    def set_position(self, offset, length, values):
+    def set_position(self, offset, length):
+        """Update the visible playback position.
+
+        offset is elapsed time, length the total length of track in seconds
+
+        """
         self.offset = offset
         self.length = length
-        self.values = values
         self.show_position()
 
     def show_position(self):
-        app.counter(self.values)
+        app.counter((self.offset, self.length-self.offset))
         app.progress(self.length and (float(self.offset) / self.length))
 
     def update_status(self):
@@ -1330,7 +1335,7 @@ class FrameOffsetPlayer(Player):
         if match:
             m1, s1, m2, s2 = map(string.atoi, match.groups())
             head, tail = m1*60+s1, m2*60+s2
-            self.set_position(head, head+tail, [head, tail])
+            self.set_position(head, head+tail)
 
 # ------------------------------------------
 class FrameOffsetPlayerMpp(Player):
@@ -1342,7 +1347,7 @@ class FrameOffsetPlayerMpp(Player):
             m1, s1, m2, s2 = map(string.atoi, match.groups())
             head = m1*60+s1
             tail = (m2*60+s2) - head
-            self.set_position(head, head+tail , [head, tail])
+            self.set_position(head, head+tail)
 
 # ------------------------------------------
 class TimeOffsetPlayer(Player):
@@ -1354,14 +1359,14 @@ class TimeOffsetPlayer(Player):
             h, m, s = map(string.atoi, match.groups())
             tail = h*3600+m*60+s
             head = max(self.length, tail) - tail
-            self.set_position(head, head+tail, [head, tail])
+            self.set_position(head, head+tail)
 
 # ------------------------------------------
 class NoOffsetPlayer(Player):
 
     def parse_buf(self):
         head = self.offset+1
-        self.set_position(head, 0, [head, head])
+        self.set_position(head, head*2)
 
     def seek(self, *dummy):
         return 1
@@ -1375,7 +1380,9 @@ class MPlayer(Player):
         if match:
             curS, totS = map(string.atoi, match.groups())
             position, length = curS, totS
-            self.set_position(position, length, [position, length])
+            self.set_position(position, length)
+        else:
+            logging.debug("Cannot parse mplayer output")
 
 # ------------------------------------------
 class Timeout:
@@ -1729,7 +1736,7 @@ PLAYERS = [
     NoOffsetPlayer("xmp -q %s", "\.(mod|xm|fm|s3m|med|col|669|it|mtm|stm)$"),
     NoOffsetPlayer("play %s", "\.(aiff|au|cdr|mp3|ogg|wav)$"),
     NoOffsetPlayer("speexdec %s", "\.spx$"),
-    MPlayer("mplayer -vo null %s", "^http://|\.(mp[123]|ogg|flac|spx|mp[cp+]|mod|xm|fm|s3m|med|col|669|it|mtm|stm|aiff|au|cdr|wav)$"),
+    MPlayer("mplayer -vo null %s", "^http://|\.(mp[123]|ogg|oga|flac|spx|mp[cp+]|mod|xm|fm|s3m|med|col|669|it|mtm|stm|aiff|au|cdr|wav)$"),
     ]
 
 MACRO = {}
