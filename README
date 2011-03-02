@@ -30,7 +30,7 @@ Installation:
 
 Usage:
 
-        cplay [-nrRv] [ file | dir | playlist ] ...
+        cplay [-mnrRv] [ file | dir | playlist ] ...
 
         When in doubt, press 'h' for a friendly help page.
 

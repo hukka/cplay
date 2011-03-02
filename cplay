@@ -44,6 +44,9 @@ except ImportError: tty = None
 try: import locale; locale.setlocale(locale.LC_ALL, "")
 except: pass
 
+import logging
+logging.basicConfig(level=logging.WARNING)
+
 # ------------------------------------------
 _locale_domain = "cplay"
 _locale_dir = "/usr/local/share/locale"
@@ -589,6 +592,7 @@ class PlaylistEntry(ListEntry):
 
     def read_metadata(self):
         self.metadata = get_tag(self.pathname)
+        logging.debug(self.metadata)
         return self.metadata
 
     vps = ListEntry.vps[:] + [[_("metadata"), vp_metadata]]
@@ -1128,20 +1132,31 @@ def get_tag(pathname):
         return pathname
     tags = {}
     # FIXME: use magic instead of file extensions to identify OGGs and MP3s
+    # FIXME: Needs to understand other formats too, at least FLAC
+    #        Check mutagen and mmpython
     if re.compile(".*\.ogg$", re.I).match(pathname):
         try:
             import ogg.vorbis
             vf = ogg.vorbis.VorbisFile(pathname)
             vc = vf.comment()
             tags = vc.as_dict()
-        except: return os.path.basename(pathname)
+        except ImportError:
+            logging.debug(sys.exc_info()[0])
+            logging.debug(sys.exc_info()[1])
+            app.status(_("Can't read metadata, module pyvorbis not available"), 1)
+            return os.path.basename(pathname)
     elif re.compile(".*\.mp3$", re.I).match(pathname):
         try:
             import ID3
             vc = ID3.ID3(pathname, as_tuple=1)
             tags = vc.as_dict()
-        except: return os.path.basename(pathname)
+        except ImportError:
+            logging.debug(sys.exc_info()[0])
+            logging.debug(sys.exc_info()[1])
+            app.status(_("Can't read metadata, module ID3 not available"), 1)
+            return os.path.basename(pathname)
     else:
+        app.status(_("Can't read metadata, I don't know this file"), 1)
         return os.path.basename(pathname)
 
     artist = tags.get("ARTIST", [""])[0]
@@ -1496,6 +1511,7 @@ class Application:
             if self.player.re_files.search(entry.pathname):
                 if self.player.setup(entry, offset): break
         else:
+            # FIXME: Needs to report suitable players
             app.status(_("Player not found!"), 1)
             self.player.stopped = 0  # keep going
             return
@@ -1624,7 +1640,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "nrRv")
     except:
-        usage = _("Usage: %s [-nrRv] [ file | dir | playlist ] ...\n")
+        usage = _("Usage: %s [-mnrRv] [ file | dir | playlist ] ...\n")
         sys.stderr.write(usage % sys.argv[0])
         sys.exit(1)
 
@@ -1642,7 +1658,8 @@ def main():
             if opt == "-n": app.restricted = 1
             if opt == "-r": app.win_playlist.command_toggle_repeat()
             if opt == "-R": app.win_playlist.command_toggle_random()
-            if opt == "-v": app.mixer("toggle")
+            if opt == "-m": app.mixer("toggle")
+            if opt == "-v": logging.getLogger().setLevel(logging.DEBUG)
         if args or playlist:
             for i in args or playlist:
                 i = os.path.exists(i) and os.path.abspath(i) or i
