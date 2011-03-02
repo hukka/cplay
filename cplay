@@ -50,8 +50,12 @@ except ImportError: import curses
 try: import tty
 except ImportError: tty = None
 
-try: import locale; locale.setlocale(locale.LC_ALL, "")
-except: pass
+try:
+    import locale
+    locale.setlocale(locale.LC_ALL, "")
+    code = locale.getpreferredencoding()
+except:
+    pass
 
 import logging
 logging.basicConfig(level=logging.WARNING)
@@ -131,11 +135,6 @@ class Keymap:
 # ------------------------------------------
 class Window:
     chars = string.letters+string.digits+string.punctuation+string.whitespace
-
-    t = ['?'] * 256
-    for c in chars: t[ord(c)] = c
-    translationTable = string.join(t, ""); del t
-
     def __init__(self, parent):
         self.parent = parent
         self.children = []
@@ -229,10 +228,9 @@ class StatusWindow(Window):
         return curses.newwin(1, self.parent.cols-12, self.parent.rows-1, 0)
 
     def update(self):
-        msg = string.translate(self.current_message, Window.translationTable)
         self.move(0, 0)
         self.clrtoeol()
-        self.insstr(cut(msg, self.cols))
+        self.insstr(cut(self.current_message, self.cols))
         self.touchwin()
         self.refresh()
 
@@ -449,7 +447,7 @@ class ListWindow(Window):
         return "%-*s  %s" % (width, cut(self.name+data, width), pos)
 
     def putstr(self, entry, *pos):
-        s = string.translate(str(entry), Window.translationTable)
+        s = str(entry)
         pos and self.move(*pos)
         if self.hoffset: s = "<%s" % s[self.hoffset+1:]
         self.insstr(cut(s, self.cols))
@@ -1199,12 +1197,10 @@ def get_tag(pathname):
 
     # FIXME: Allow user to configure metadata view
     try:
-        import codecs
-        return codecs.latin_1_encode(
-                " ".join(f.get('artist', ('?',))) + " - " +
-                " ".join(f.get('album', ('?',))) + " - " +
-                " ".join(f.get('tracknumber', ('?',))) + " " +
-                " ".join(f.get('title', ('?',))))[0]
+        return (" ".join(f.get('artist', ('?',))) + " - " +
+               " ".join(f.get('album', ('?',))) + " - " +
+               " ".join(f.get('tracknumber', ('?',))) + " " +
+               " ".join(f.get('title', ('?',)))).encode(code, 'replace')
     except:
         logging.debug(traceback.print_exc())
         return os.path.basename(pathname)
@@ -1696,6 +1692,7 @@ def main():
             if opt == "-R": app.win_playlist.command_toggle_random()
             if opt == "-m": app.mixer("toggle")
             if opt == "-v": logging.getLogger().setLevel(logging.DEBUG)
+        logging.debug("Preferred locale is " + str(code))
         if args or playlist:
             for i in args or playlist:
                 i = os.path.exists(i) and os.path.abspath(i) or i
