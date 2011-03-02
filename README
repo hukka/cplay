@@ -10,6 +10,7 @@ Requirements:
         - cplay                   http://www.tf.hut.fi/~flu/cplay/
         - python                  http://www.python.org/
         - python-oss  (optional)  http://net.indra.com/~tim/ossmodule/
+        - mplayer  (recommended)  http://www.mplayerhq.hu/
         - mpg321      (optional)  http://sourceforge.net/projects/mpg321/
         - ogg123      (optional)  http://www.vorbis.com/
         - mpg123      (optional)  http://www.mpg123.org/

@@ -1146,7 +1146,9 @@ def get_type(pathname):
             ftype = 'oggflac'
         elif re.match("FLAC audio bitstream.*", mg_string):
             ftype = 'flac'
-        elif re.match("Audio file with ID.*layer III.*", mg_string):
+        # For some reason not all ID3 tagged files return an ID3 identifier,
+        # so we just need to look for mp3 files and hope they are also ID3d.
+        elif re.match(".*MPEG ADTS, layer III.*", mg_string):
             ftype = 'id3'
         else:
             ftype = "unknown"
@@ -1193,8 +1195,8 @@ def get_tag(pathname):
             return os.path.basename(pathname)
         f = metaopen(pathname)
     except:
-        logging.debug(traceback.print_exc())
-        app.status(logging.debug(": ".join(sys.exc_info()[:1])), 1)
+        logging.debug(traceback.format_exc())
+        app.status("Error reading metadata", 1)
         return os.path.basename(pathname)
 
     # FIXME: Allow user to configure metadata view
@@ -1204,7 +1206,7 @@ def get_tag(pathname):
                " ".join(f.get('tracknumber', ('?',))) + " " +
                " ".join(f.get('title', ('?',)))).encode(code, 'replace')
     except:
-        logging.debug(traceback.print_exc())
+        logging.debug(traceback.format_exc())
         return os.path.basename(pathname)
 
 # ------------------------------------------
@@ -1226,12 +1228,17 @@ class Player:
         self.tid = None
 
     def setup(self, entry, offset):
+        """Ready the player with given ListEntry and seek offset"""
+
         self.argv = string.split(self.commandline)
         self.argv[0] = which(self.argv[0])
         for i in range(len(self.argv)):
-            if self.argv[i] == "%s": self.argv[i] = entry.pathname
-            if self.argv[i] == "%d": self.argv[i] = str(offset*self.fps)
+            if self.argv[i] == "{file}":
+                self.argv[i] = entry.pathname
+            if self.argv[i] == "{offset}":
+                self.argv[i] = str(offset*self.fps)
         self.entry = entry
+        self.offset = offset
         if offset == 0:
             app.progress(0)
             self.offset = 0
@@ -1240,6 +1247,8 @@ class Player:
         return self.argv[0]
 
     def play(self):
+        logging.debug(" ".join(["Executing"] + self.argv))
+        logging.debug("My offset is %d" % self.offset)
         self.pid = os.fork()
         if self.pid == 0:
             os.dup2(self.stdin_w, sys.stdin.fileno())
@@ -1374,6 +1383,16 @@ class NoOffsetPlayer(Player):
 # ------------------------------------------
 class MPlayer(Player):
     re_progress = re.compile("^A:.*?(\d+)\.\d \([^)]+\) of (\d+)\.\d")
+
+    def play(self):
+        if os.path.exists(CONTROL_FIFO + "-mplayer"):
+            os.unlink(CONTROL_FIFO + "-mplayer")
+        os.mkfifo(CONTROL_FIFO + "-mplayer", 0600)
+        Player.play(self)
+        fifo = open(CONTROL_FIFO + "-mplayer", 'w')
+        fifo.write("seek %d\n" % self.offset)
+        fifo.flush()
+        fifo.close()
 
     def parse_buf(self):
         match = self.re_progress.search(self.buf)
@@ -1721,22 +1740,24 @@ def main():
         app.cleanup()
     except Exception:
         app.cleanup()
-        import traceback
         traceback.print_exc()
 
 # ------------------------------------------
 PLAYERS = [
-    FrameOffsetPlayer("ogg123 -q -v -k %d %s", "\.(ogg|flac|spx)$"),
-    FrameOffsetPlayer("splay -f -k %d %s", "(^http://|\.mp[123]$)", 38.28),
-    FrameOffsetPlayer("mpg123 -q -v -k %d %s", "(^http://|\.mp[123]$)", 38.28),
-    FrameOffsetPlayer("mpg321 -q -v -k %d %s", "(^http://|\.mp[123]$)", 38.28),
-    FrameOffsetPlayerMpp("mppdec --gain 2 --start %d %s", "\.mp[cp+]$"),
-    TimeOffsetPlayer("madplay -v --display-time=remaining -s %d %s", "\.mp[123]$"),
-    NoOffsetPlayer("mikmod -q -p0 %s", "\.(mod|xm|fm|s3m|med|col|669|it|mtm)$"),
-    NoOffsetPlayer("xmp -q %s", "\.(mod|xm|fm|s3m|med|col|669|it|mtm|stm)$"),
-    NoOffsetPlayer("play %s", "\.(aiff|au|cdr|mp3|ogg|wav)$"),
-    NoOffsetPlayer("speexdec %s", "\.spx$"),
-    MPlayer("mplayer -vo null %s", "^http://|\.(mp[123]|ogg|oga|flac|spx|mp[cp+]|mod|xm|fm|s3m|med|col|669|it|mtm|stm|aiff|au|cdr|wav)$"),
+    MPlayer("mplayer -input file=%s -vc null -vo null {file}" %
+                (CONTROL_FIFO + "-mplayer"),
+            "^http://|\.(mp[123]|ogg|oga|flac|spx|mp[cp+]|mod|xm|fm|s3m|" +
+                "med|col|669|it|mtm|stm|aiff|au|cdr|wav)$"),
+    FrameOffsetPlayer("ogg123 -q -v -k {offset} {file}", "\.(ogg|flac|spx)$"),
+    FrameOffsetPlayer("splay -f -k {offset} {file}", "(^http://|\.mp[123]$)", 38.28),
+    FrameOffsetPlayer("mpg123 -q -v -k {offset} {file}", "(^http://|\.mp[123]$)", 38.28),
+    FrameOffsetPlayer("mpg321 -q -v -k {offset} {file}", "(^http://|\.mp[123]$)", 38.28),
+    FrameOffsetPlayerMpp("mppdec --gain 2 --start {offset} {file}", "\.mp[cp+]$"),
+    TimeOffsetPlayer("madplay -v --display-time=remaining -s {offset} {file}", "\.mp[123]$"),
+    NoOffsetPlayer("mikmod -q -p0 {file}", "\.(mod|xm|fm|s3m|med|col|669|it|mtm)$"),
+    NoOffsetPlayer("xmp -q {file}", "\.(mod|xm|fm|s3m|med|col|669|it|mtm|stm)$"),
+    NoOffsetPlayer("play {file}", "\.(aiff|au|cdr|mp3|ogg|wav)$"),
+    NoOffsetPlayer("speexdec {file}", "\.spx$"),
     ]
 
 MACRO = {}
