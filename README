@@ -18,11 +18,10 @@ Requirements:
         - mikmod      (optional)  http://www.mikmod.org/
         - fintl       (optional)  http://www.python.org/sigs/i18n-sig/
         - pyncurses   (optional)  http://pyncurses.sourceforge.net/
-        - ID3-py      (optional)  http://id3-py.sourceforge.net/
-        - pyvorbis    (optional)  http://www.duke.edu/~ahc4/pyogg/
         - xmp         (optional)  http://xmp.sf.net/
         - sox         (optional)  http://sox.sf.net/
         - speex       (optional)  http://www.speex.org/
+        - mutagen     (optional)  http://code.google.com/p/mutagen/
 
 Installation:
 
@@ -50,10 +49,6 @@ Configuration:
         Note, there is currently no version control for the rc-file!
 
 Miscellaneous:
-
-        In order for either mp3info (ID3) or ogginfo to work,
-        both corresponding python modules have to be installed.
-        This will probably change someday.
 
         A playlist can contain URLs, but the playlist itself will
         have to be local. For mpeg streaming, splay is recommended.

@@ -29,11 +29,13 @@ import os
 import sys
 import time
 import getopt
+import re
 import signal
 import string
 import select
 from subprocess import call
-import re
+import traceback
+
 
 try: from ncurses import curses
 except ImportError: import curses
@@ -1127,51 +1129,54 @@ class PlaylistWindow(TagListWindow):
             app.status(e, 2)
 
 # ------------------------------------------
+# FIXME: Metadata gathering seems a bit slow now. Perhaps it could be done
+#        in background so it wouldn't slow down responsiveness
 def get_tag(pathname):
     if re.compile("^http://").match(pathname) or not os.path.exists(pathname):
         return pathname
-    tags = {}
+    try:
+        import mutagen
+    except ImportError:
+        logging.debug("No mutagen available")
+        app.status(_("Can't read metadata, module mutagen not available"), 2)
+        return pathname
+
     # FIXME: use magic instead of file extensions to identify OGGs and MP3s
     # FIXME: Needs to understand other formats too, at least FLAC
     #        Check mutagen and mmpython
-    if re.compile(".*\.ogg$", re.I).match(pathname):
-        try:
-            import ogg.vorbis
-            vf = ogg.vorbis.VorbisFile(pathname)
-            vc = vf.comment()
-            tags = vc.as_dict()
-        except ImportError:
-            logging.debug(sys.exc_info()[0])
-            logging.debug(sys.exc_info()[1])
-            app.status(_("Can't read metadata, module pyvorbis not available"), 1)
+    try:
+        if re.compile(".*\.ogg$", re.I).match(pathname):
+            import mutagen.oggvorbis
+            metaopen = mutagen.oggvorbis.Open
+        elif re.compile(".*\.mp3$", re.I).match(pathname):
+            import mutagen.easyid3
+            metaopen = mutagen.easyid3.Open
+        elif re.compile(".*\.flac$", re.I).match(pathname):
+            import mutagen.flac
+            metaopen = mutagen.flac.Open
+        elif re.compile(".*\.oga$", re.I).match(pathname):
+            import mutagen.oggflac
+            metaopen = mutagen.oggflac.Open
+        else:
+            app.status(_("Can't read metadata, I don't know this file"), 1)
             return os.path.basename(pathname)
-    elif re.compile(".*\.mp3$", re.I).match(pathname):
-        try:
-            import ID3
-            vc = ID3.ID3(pathname, as_tuple=1)
-            tags = vc.as_dict()
-        except ImportError:
-            logging.debug(sys.exc_info()[0])
-            logging.debug(sys.exc_info()[1])
-            app.status(_("Can't read metadata, module ID3 not available"), 1)
-            return os.path.basename(pathname)
-    else:
-        app.status(_("Can't read metadata, I don't know this file"), 1)
+        f = metaopen(pathname)
+    except:
+        logging.debug(traceback.print_exc())
+        app.status(logging.debug(": ".join(sys.exc_info()[:1])), 1)
         return os.path.basename(pathname)
 
-    artist = tags.get("ARTIST", [""])[0]
-    title = tags.get("TITLE", [""])[0]
-    tag = os.path.basename(pathname)
+    # FIXME: Allow user to configure metadata view
     try:
         import codecs
-        if artist and title:
-            tag = codecs.latin_1_encode(artist)[0] + " - " + codecs.latin_1_encode(title)[0]
-        elif artist:
-            tag = artist
-        elif title:
-            tag = title
-        return codecs.latin_1_encode(tag)[0]
-    except: return tag
+        return codecs.latin_1_encode(
+                " ".join(f.get('artist', ('?',))) + " - " +
+                " ".join(f.get('album', ('?',))) + " - " +
+                " ".join(f.get('tracknumber', ('?',))) + " " +
+                " ".join(f.get('title', ('?',))))[0]
+    except:
+        logging.debug(traceback.print_exc())
+        return os.path.basename(pathname)
 
 # ------------------------------------------
 class Player:
