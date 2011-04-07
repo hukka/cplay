@@ -631,11 +631,14 @@ class TagListWindow(ListWindow):
         sys.stderr.write("\n")
         argv = map(lambda x: x.pathname, self.get_tagged())
         argv or self.current() and argv.append(self.current().pathname)
-        r = call([s, '--'] + argv, shell=True)
-        sys.stderr.write("\nshell returned %s, press return!\n" % r)
-        sys.stdin.readline()
+        ret_value = call([s, '--'] + argv, shell=True)
+        if ret_value != 0:
+            sys.stderr.write("\nshell returned %s, press return!\n" % ret_value)
+            sys.stdin.readline()
         app.win_root.update()
         app.restore_default_status()
+        if ret_value == 0:
+            app.status(_("Command succesfull"), 3)
         app.cursor(0)
 
     def complete_shell(self, line):
