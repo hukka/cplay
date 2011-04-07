@@ -631,7 +631,7 @@ class TagListWindow(ListWindow):
         sys.stderr.write("\n")
         argv = map(lambda x: x.pathname, self.get_tagged())
         argv or self.current() and argv.append(self.current().pathname)
-        r = call(' '.join([s] + argv), shell=True)
+        r = call([s, '--'] + argv, shell=True)
         sys.stderr.write("\nshell returned %s, press return!\n" % r)
         sys.stdin.readline()
         app.win_root.update()
