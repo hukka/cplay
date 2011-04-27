@@ -1647,6 +1647,12 @@ class Application:
         except Exception, e: app.status(e, 2)
 
     def _mixer(self, cmd, arg):
+        """Give a command to the audio mixer.
+        
+        cmd -- 'toggle' to change mixed channel to next,
+               'set' to set the volume to arg, or
+               'cue' to increase the volume by arg.
+        """
         try:
             import ossaudiodev
             mixer = ossaudiodev.openmixer()
@@ -1666,11 +1672,15 @@ class Application:
             # Thus, we aren't using OSS.
             pass
 
+        # FIXME: ALSA is probably the common case, so it should come first
+        # but pyalsaaudio docs don't say what error is thrown if it's used
+        # on a system with no alsa...
         try: # ALSA
             import alsaaudio
             mixer = alsaaudio.Mixer()
             get, set = mixer.getvolume, mixer.setvolume
             name = 'MASTER'
+            # FIXME: No 'toggle' support
             if cmd is "set": set(arg)
             if cmd is "cue" and arg!=0: # ALSA doesn't do integer increments
                 oldvolume = get()[0]
@@ -1786,7 +1796,8 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "nrRd:")
     except:
-        usage = _("Usage: %s [-mnrRv] [ file | dir | playlist ] ...\n")
+        usage = _("Usage: %s [-d <filename>] [-nrR]" 
+                  "[ file | dir | playlist ] ...\n")
         sys.stderr.write(usage % sys.argv[0])
         sys.exit(1)
 
@@ -1807,7 +1818,6 @@ def main():
             if opt == "-n": app.restricted = 1
             if opt == "-r": app.win_playlist.command_toggle_repeat()
             if opt == "-R": app.win_playlist.command_toggle_random()
-            if opt == "-m": app.mixer("toggle")
         logging.debug("Preferred locale is " + str(code))
         if args or playlist:
             for i in args or playlist:
