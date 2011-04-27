@@ -22,19 +22,28 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 """
 
-# ------------------------------------------
-from types import *
-
-import os
-import sys
-import time
+import curses
 import getopt
+import gettext
+import locale
+import logging
+import os
 import re
+import select
 import signal
 import string
-import select
 from subprocess import call
+import sys
+import time
 import traceback
+import tty
+
+locale.setlocale(locale.LC_ALL, "")
+code = locale.getpreferredencoding()
+
+_locale_domain = "cplay"
+_locale_dir = "/usr/local/share/locale"
+gettext.install(_locale_domain, _locale_dir)
 
 global mg
 try:
@@ -44,42 +53,11 @@ try:
 except ImportError:
     mg = None
 
-try: from ncurses import curses
-except ImportError: import curses
 
-try: import tty
-except ImportError: tty = None
-
-try:
-    import locale
-    locale.setlocale(locale.LC_ALL, "")
-    code = locale.getpreferredencoding()
-except:
-    pass
-
-import logging
-
-# ------------------------------------------
-_locale_domain = "cplay"
-_locale_dir = "/usr/local/share/locale"
-
-try:
-    import gettext  # python 2.0
-    gettext.install(_locale_domain, _locale_dir)
-except ImportError:
-    try:
-        import fintl
-        fintl.bindtextdomain(_locale_domain, _locale_dir)
-        fintl.textdomain(_locale_domain)
-        _ = fintl.gettext
-    except ImportError:
-        def _(s): return s
-except:
-    def _(s): return s
-
-# ------------------------------------------
 XTERM = re.search("rxvt|xterm", os.environ["TERM"])
-CONTROL_FIFO = "%s/cplay-control-%s" % (os.environ.get("TMPDIR", "/tmp"), os.environ["USER"])
+CONTROL_FIFO = ("%s/cplay-control-%s" %
+                (os.environ.get("TMPDIR", "/tmp"), os.environ["USER"]))
+
 # Ten band graphical equalizers for mplayer, see man (1) mplayer
 # Default: first entry
 EQUALIZERS = [
@@ -124,10 +102,11 @@ class Keymap:
         self.methods = [None] * curses.KEY_MAX
 
     def bind(self, key, method, args=None):
-        if type(key) in (TupleType, ListType):
-            for i in key: self.bind(i, method, args)
+        if isinstance(key, (tuple, list)):
+            for i in key:
+                self.bind(i, method, args)
             return
-        if type(key) is StringType:
+        elif isinstance(key, str):
             key = ord(key)
         self.methods[key] = (method, args)
 
@@ -496,16 +475,16 @@ class ListWindow(Window):
 
     def cursor_end(self): self.cursor_move(-self.bufptr - 1)
 
-    def start_search(self, type, direction):
+    def start_search(self, prompt_text, direction):
         self.search_direction = direction
         self.not_found = 0
         if app.input_mode:
-            app.input_prompt = "%s: " % type
+            app.input_prompt = "%s: " % prompt_text
             self.do_search(advance = direction)
         else:
             app.do_input_hook = self.do_search
             app.stop_input_hook = self.stop_search
-            app.start_input(type)
+            app.start_input(prompt_text)
 
     def stop_search(self):
         self.last_search = app.input_string
@@ -1269,6 +1248,8 @@ class Player:
     def play(self):
         logging.debug(" ".join(["Executing"] + self.argv))
         logging.debug("My offset is %d" % self.offset)
+        # FIXME: Fork is complicated for no gain. subprocess.call
+        # won't need which() either.
         self.pid = os.fork()
         if self.pid == 0:
             os.dup2(self.stdin_r, sys.stdin.fileno())
@@ -1666,6 +1647,25 @@ class Application:
         except Exception, e: app.status(e, 2)
 
     def _mixer(self, cmd, arg):
+        try:
+            import ossaudiodev
+            mixer = ossaudiodev.openmixer()
+            get, set = mixer.get, mixer.set
+            self.channels = self.channels or \
+                [['MASTER', ossaudiodev.SOUND_MIXER_VOLUME],
+                 ['PCM', ossaudiodev.SOUND_MIXER_PCM]]
+            if cmd == "toggle": self.channels.insert(0, self.channels.pop())
+            name, channel = self.channels[0]
+            if cmd == "cue": arg = min(100, max(0, get(channel)[0] + arg))
+            if cmd in ["set", "cue"]: set(channel, (arg, arg))
+            app.status(_("%s volume %s%%") % (name, get(channel)[0]), 1)
+            mixer.close()
+            return
+        except IOError:
+            # If /dev/mixer is not available, opening the mixer fails.
+            # Thus, we aren't using OSS.
+            pass
+
         try: # ALSA
             import alsaaudio
             mixer = alsaaudio.Mixer()
@@ -1682,27 +1682,9 @@ class Application:
                         (oldvolume==100 and arg>0)): 
                         break
             app.status(_("%s volume %s%%") % (name, get()[0]), 1)
-        except: # OSS
-            try:
-                import ossaudiodev
-                mixer = ossaudiodev.openmixer()
-                get, set = mixer.get, mixer.set
-                self.channels = self.channels or \
-                    [['MASTER', ossaudiodev.SOUND_MIXER_VOLUME],
-                     ['PCM', ossaudiodev.SOUND_MIXER_PCM]]
-            except ImportError:
-                import oss
-                mixer = oss.open_mixer()
-                get, set = mixer.read_channel, mixer.write_channel
-                self.channels = self.channels or \
-                    [['MASTER', oss.SOUND_MIXER_VOLUME],
-                     ['PCM', oss.SOUND_MIXER_PCM]]
-            if cmd == "toggle": self.channels.insert(0, self.channels.pop())
-            name, channel = self.channels[0]
-            if cmd == "cue": arg = min(100, max(0, get(channel)[0] + arg))
-            if cmd in ["set", "cue"]: set(channel, (arg, arg))
-            app.status(_("%s volume %s%%") % (name, get(channel)[0]), 1)
-            mixer.close()
+            return
+        except ImportError:
+            app.status(_("Not using OSS and no alsa support available"), 2)
 
     def speed_incr(self):
         if(isinstance(self.player, MPlayer)):
