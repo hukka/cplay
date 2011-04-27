@@ -1,3 +1,23 @@
+2011-04-27  Tomi Pieviläinen <tomi.pievilainen@iki.fi>
+
+	*** 1.50 released ***
+
+	* cplay:
+	- fix insecure /tmp handling (DB#255768, DB#324913) (Peter Samuelson)
+	- fix shell crashing (DB#375060)
+	- UTF-8 support (DB#279000)
+	- debug logging
+	- mutagen support (with ogg/flac metadata and fix to DB#413738)
+	- file recognition with magic (based on Jesus Climent)
+	- mplayer support with equalizer and speed support (Tom Adams,
+	  Daniel Michalik)
+	- preliminary ALSA mixer support (Tom Adams)
+	- bugfixes (many authors)
+
+	* cnq: New executable to enque tracks to cplay (Tom Adams, fixes
+	DB#226167)
+
+
 2006-05-09  Ulf Betlehem  <flu@iki.fi>
 	
 	*** 1.50pre7 ***

@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- python -*-
 
-__version__ = "cplay 1.50pre7"
+__version__ = "cplay 1.50"
 
 """
 cplay - A curses front-end for various audio players
 Copyright (C) 1998-2005 Ulf Betlehem <flu@iki.fi>
+              2005-2010 see AUTHORS
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
