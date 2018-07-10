@@ -1,3 +1,6 @@
+DEPRECATION NOTICE:
+This repo hasn't gotten any love in a long, long time. You might be interested in trying andreasvc/cplay or xi/cplay-ng
+
 Description:
 
         cplay is a curses front-end for various audio players. It aims
